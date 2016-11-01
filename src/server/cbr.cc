@@ -1,3 +1,30 @@
+/**
+ * *****************************************************************************
+ * Code adaptation and development based on
+ * https://github.com/m-lab/mbm
+ *
+ * This code includes an adaptation and simplication of the software developed at:
+ * M-Lab (http://www.measurementlab.net),
+ * gflags library  (google-gflags@googlegroups.com),
+ * gtest (http://code.google.com/p/googletest/)
+ * and pthreads-win32 (LGPL).
+ *
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************
+ */
+
+
 #include "server/cbr.h"
 
 #if defined(OS_FREEBSD)
@@ -91,7 +118,7 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
   signal(SIGPIPE, SIG_IGN);
 
   uint32_t tcp_mss = config.mss_bytes;
-  socklen_t mss_len = sizeof(tcp_mss);
+  //socklen_t mss_len = sizeof(tcp_mss); // EHU NQAS
 
   // get server and client ip address
   sockaddr_storage server_addr; 
@@ -122,7 +149,7 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
   
   switch (test_socket->type()) {
     case SOCKETTYPE_TCP:
-      if (getsockopt(test_socket->raw(), IPPROTO_TCP, TCP_MAXSEG,
+      /*if (getsockopt(test_socket->raw(), IPPROTO_TCP, TCP_MAXSEG,
                      &tcp_mss, &mss_len) != 0) {
         if (errno != ENOPROTOOPT) {
           std::cerr << "Failed to get TCP_MAXSEG: " << strerror(errno) << "\n";
@@ -130,11 +157,14 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
         }
         std::cout << "Socket does not support TCP_MAXSEG opt. "
                   << "Using default " << TCP_MSS << std::endl;
-      }
+      }*/ // EHU NQAS
+      //tcp_mss = TCP_MSS;
+      tcp_mss=config.mss_bytes;
       break;
 
     case SOCKETTYPE_UDP:
-      tcp_mss = TCP_MSS;
+      //tcp_mss = TCP_MSS;
+      tcp_mss=config.mss_bytes;
       break;
 
     default:
@@ -153,9 +183,9 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
   // we're going to meter the bytes into the socket interface in units of
   // tcp_mss
   uint32_t bytes_per_chunk = config.mss_bytes;
-  if (test_socket->type() == SOCKETTYPE_TCP) {
+  /*if (test_socket->type() == SOCKETTYPE_TCP) {
     bytes_per_chunk = std::min(config.mss_bytes, tcp_mss);
-  }
+  }*/ // EHU NQAS
 
   // calculate how many chunks per second we want to send
   uint32_t chunks_per_sec = bytes_per_sec / bytes_per_chunk;
@@ -175,9 +205,11 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
   uint32_t max_test_time_sec =
     std::min(TEST_BASE_SEC + TEST_INCR_SEC_PER_MB * config.cbr_kb_s / 1000,
              static_cast<unsigned>(TEST_MAX_SEC));
+  //min(30+15*0.6,300)=39
   uint32_t max_cwnd_time_sec =
     std::min(CWND_BASE_SEC + CWND_INCR_SEC_PER_MB * config.cbr_kb_s / 1000,
              static_cast<unsigned>(CWND_MAX_SEC));
+  //min(15+5*0.6,50)=18
   if (test_socket->type() == SOCKETTYPE_UDP)
     max_cwnd_time_sec = 0;
   uint32_t max_test_pkt = max_test_time_sec * chunks_per_sec;
@@ -283,6 +315,7 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
   #endif
 
   Result test_result = RESULT_INCONCLUSIVE;
+  std::cout << "First RESULT_INCONCLUSIVE assignment" << std::endl;
   bool result_set = false;
   uint64_t outer_start_time = GetTimeNS();
   uint64_t missed_total = 0;
@@ -296,6 +329,7 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
 
     #ifdef USE_WEB100
     if (test_socket->type() == SOCKETTYPE_TCP) {
+      std::cout << "ENTRY cauze TCP" << std::endl;
       // sample the data once a second
       if (generator.packets_sent() % chunks_per_sec == 0) {
         // statistical test
@@ -331,6 +365,7 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
       if (missed_total > (curr_time - outer_start_time) / 2) {
         // Inconclusive because the test failed to generate the traffic pattern
         test_result = RESULT_INCONCLUSIVE;
+	std::cout << "RESULT_INCONCLUSIVE because test failed to generate the traffic pattern" << std::endl;
         result_set = true;
         break;
       }
@@ -438,12 +473,17 @@ Result RunCBR(const mlab::AcceptedSocket* test_socket,
     }
   }
   #endif
-  if (test_socket->type() == SOCKETTYPE_UDP) {
+
+  // EHU NQAS //FOR BOTH TYPES.
+  //if (test_socket->type() == SOCKETTYPE_UDP) {
+  if (test_socket->type() == SOCKETTYPE_UDP || test_socket->type() == SOCKETTYPE_TCP) {
     std::cout << "  lost: " << lost_packets << "\n";
   }
 
   // determine the result of the test
-  if (test_socket->type() == SOCKETTYPE_UDP && !result_set)
+  // EHU NQAS //FOR BOTH TYPES.
+  //if (test_socket->type() == SOCKETTYPE_UDP && !result_set)
+  if ((test_socket->type() == SOCKETTYPE_UDP || test_socket->type() == SOCKETTYPE_TCP) && !result_set)
     test_result = tester.test_result(generator.packets_sent(), lost_packets);
 
   // print the result, and send it to the client

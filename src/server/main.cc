@@ -1,9 +1,37 @@
+/**
+ * *****************************************************************************
+ * Code adaptation and development based on
+ * https://github.com/m-lab/mbm
+ *
+ * This code includes an adaptation and simplication of the software developed at:
+ * M-Lab (http://www.measurementlab.net),
+ * gflags library  (google-gflags@googlegroups.com),
+ * gtest (http://code.google.com/p/googletest/)
+ * and pthreads-win32 (LGPL).
+ *
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *****************************************************************************
+ */
+
+
 #include <assert.h>
 #include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
 #ifdef USE_WEB100
 extern "C" {
 #include <web100/web100.h>
@@ -30,6 +58,8 @@ extern "C" {
 
 DEFINE_int32(port, 4242, "The port to listen on");
 DEFINE_bool(verbose, false, "Verbose output");
+DEFINE_string(socket_type, "udp", "The transport protocol to use. Ignored if "
+                                  "--sweep is set.");
 
 namespace {
 bool ValidatePort(const char* flagname, int32_t value) {
@@ -205,8 +235,19 @@ int main(int argc, char* argv[]) {
   for (int i = 0; i < NUM_PORTS; ++i)
     used_port[i] = false;
 
-  scoped_ptr<mlab::ListenSocket> socket(
-      mlab::ListenSocket::CreateOrDie(FLAGS_port));
+  SocketType socket_type_local;  //EHU NQAS
+
+  if (FLAGS_socket_type == "udp")  //EHU NQAS
+      socket_type_local = SOCKETTYPE_UDP;  //EHU NQAS
+  else  //EHU NQAS
+      socket_type_local = SOCKETTYPE_TCP; //EHU NQAS
+  
+
+  //scoped_ptr<mlab::ListenSocket> socket(
+  //    mlab::ListenSocket::CreateOrDie(FLAGS_port));
+
+  scoped_ptr<mlab::ListenSocket> socket(mlab::ListenSocket::CreateOrDie(FLAGS_port, socket_type_local)); //EHU NQAS
+
   std::cout << "Listening on port " << FLAGS_port << std::endl;
 
   while (true) {
